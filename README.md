@@ -1,14 +1,9 @@
-Application Passwords Plugin for Roundcube
-==========================================
-This RoundCube plugin adds support for managing application-specific
-passwords to Roundcube's settings task. Currently only SQL-based stores
-for application-specific passwords are supported.
+# Application Specific Passwords for Roundcube
+Application specific password let you sign in to your account securely when using third-party apps with your email account.
+It's recommended to install this along side of Roundcube two-factor authentication.
 
-Application-specific passwords allow users to create a unique password for 
-each application interacting with the email server. Additionally the usage 
-of regular user passwords may be completely disabled for email protocols 
-such as SMTP, IMAP or POP3 to lower the risk of stealing username and 
-password combination by eavesdropping in insecure networks.
+This repo is a fork of [https://github.com/dweuthen/roundcube-application_passwords](https://github.com/dweuthen/roundcube-application_passwords).
+
 
 License
 -------
@@ -28,72 +23,78 @@ along with this program. If not, see http://www.gnu.org/licenses/.
 Installation
 ------------
 - Clone from github:
-    HOME_RC/plugins$ git clone [https://github.com/dweuthen/roundcube-application_passwords.git](https://github.com/dweuthen/roundcube-application_passwords.git) application_passwords
+    roundcube/plugins
 
-- Activate the plugin into HOME_RC/config/main.inc.php:
+```
+ git clone https://github.com/adompier/application-specific-password.git application_passwords
+```
+- Activate the plugin into roundcube/config/config.inc.php:
+
+```
     $rcmail_config['plugins'] = array('application_passwords');
-
+```
 Configuration
 -------------
-Copy config.inc.php.dist to config.inc.php and set the options as described
+Copy *config.inc.php.dist* to *config.inc.php* and set the options as described
 within the file.
 
 The SQL queries in config.php.dist work with belows example setup.
 
-Example Setup
--------------
+## Example Setup
 
-This plugin has been developed on a Debian-based Exim/Dovecot email server 
-where domains and users are managed in MySQL. 
+Table __vpopmail__ as used with Dovecot SQL driver
 
-Dovecot expects that user and password database lookups only return a single 
-result set. Therefore salted password hashes cannot be used for application-
-specific passwords, as multiple password hashes would be returned (one for 
-each application). As an alternative, a strong hash function such as SHA512 
-can be used to store the application-specific passwords. The used hash 
-function must be supported by the SQL server as the database server has to 
-apply it to the submitted plain text password in the where-clause. 
+| Field     | Type       | Null | Key | Default | Extra |
+| --------- | ---------- | ---- | --- | ------- | ----- |
+| pw_name   | char(32)   | NO   | PRI | NULL    |       |
+| pw_domain | char(96)   | NO   | PRI | NULL    |       |
+| pw_passwd | char(255)  | YES  |     | NULL    |       |
+| pw_uid    | int(11)    | YES  |     | NULL    |       |
+| pw_gid    | int(11)    | YES  |     | NULL    |       |
+| pw_gecos  | char(48)   | YES  |     | NULL    |       |
+| pw_dir    | char(160)  | YES  |     | NULL    |       |
+| pw_shell  | char(20)   | YES  |     | NULL    |       |
+| 2FA       | tinyint(1) | NO   |     | 0       |       |
 
-In theory other methods of storing encrypting passwords are supported but have
-not been tested.
+The 2FA field was added to trigger application specific password for remote hosts. All
+local requests are assumed to be from roundcube.
 
-The database tables used in this example setup have been created with the 
-following SQL statements:
+The table used in this example is created with the 
+following SQL statement:
 
-> CREATE TABLE `users` (
->  `username` varchar(128) NOT NULL,
->  `domain` varchar(128) NOT NULL,
->  `password` varchar(255) DEFAULT NULL,
->  `uid` smallint(5) unsigned DEFAULT NULL,
->  `gid` smallint(5) unsigned DEFAULT NULL,
->  `home` varchar(255) DEFAULT NULL,
->  `mail` varchar(255) DEFAULT NULL
-> ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
-
-> CREATE TABLE `applications` (
->   `username` varchar(128) NOT NULL,
->   `domain` varchar(128) NOT NULL,
->   `application` varchar(128) NOT NULL,
->   `password` varchar(255) DEFAULT NULL,
->   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
-> ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-
+```
+ CREATE TABLE `applications` (
+   `username` varchar(128) NOT NULL,
+   `domain` varchar(128) NOT NULL,
+   `application` varchar(128) NOT NULL,
+   `password` varchar(255) DEFAULT NULL,
+   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+```
 In order to authenticate applications in Dovecot the following "password_query" is 
 used:
 
-> SELECT username, domain, NULL AS password, 'Y' as nopassword FROM applications WHERE username = '%n' AND domain = '%d' AND password = SHA2('%w',"512")
-
+```
+password_query = SELECT CONCAT(pw_name, '@', '%d') AS user, \                                                                                                                                                                           
+  if(2FA = '1' and ('%r' != '%l'),t2.password,pw_passwd) AS password, \                                                                                                                                                                 
+  pw_dir as userdb_home, \                                                                                                                                                                                                                                                                                                                                                                                                                              
+  FROM `vpopmail` \                                                                                                                                                                                                                     
+  LEFT JOIN `applications` as t2 on t2.username = '%n' and t2.domain='%d' \                                                                                                                                                       
+  WHERE pw_name = '%n' AND pw_domain = '%d' \                                                                                                                                                                                           
+  AND ('%r' = '%l' or ('%r' != '%l' and 2FA='0') or (2FA='1' and ('%r' != '%l') and encrypt('%w', t2.password) = t2.password))  limit 1                                                                                                                                                                          D ('%r' = '%l' or ('%r' != '%l' and 2FA='0') or (2FA='1' and ('%r' != '%l') and encrypt('%w', t2.password) = t2.password))  limit 1 
+```
 The "user_query" is still set to query the user table:
 
->  SELECT home, uid, gid FROM users WHERE username = '%n' AND domain = '%d'
+```
+ user_query = \                                                                                                                                                                                                                          
+   SELECT pw_dir AS home, \                                                                                                                                                                                                                                                                                                                                                                                                                                   
+   CONCAT('*:bytes=', REPLACE(SUBSTRING_INDEX(pw_shell, 'S', 1), 'NOQUOTA', '0')) AS quota_rule \                                                                                                                                        
+   FROM vpopmail \                                                                                                                                                                                                                       
+   WHERE pw_name = '%n' AND pw_domain = '%d' \                                                                                                                                                                                           
+```
 
 Notes
 -----
-Tested with RoundCube 1.0.1 on Debian Wheezy (PHP 5.4.4, MySQL 5.5.37)
-Parts of the code was taken from Aleksander Machniak's Password Plugin for 
-Roundcube and the author was inspired by Google's implementation of 
-application-specific passwords.
+Tested for Roundcube 1.5 on Centos 7 using PHP 7.3
 
-Author
-------
-Daniel Weuthen <daniel@weuthen-net.de>
+

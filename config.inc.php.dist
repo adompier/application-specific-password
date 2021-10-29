@@ -20,13 +20,13 @@ $config['application_passwords_db_dsn'] = 'mysql://user:password@localhost/table
 //         (in case the username is an email address)
 
 // SQL query for displaying list of applications for which a password is set
-$config['application_passwords_select_query'] = 'SELECT application, created FROM vmail.applications WHERE username=%l AND domain=%d';
+$config['application_passwords_select_query'] = 'SELECT application, created FROM applications WHERE username=%l AND domain=%d';
 
 // SQL query for storing new application-specific password
-$config['application_passwords_insert_query'] = 'INSERT INTO vmail.applications (username, domain, application, password) VALUES (%l, %d, %a, SHA2(%p,"512"))';
+$config['application_passwords_insert_query'] = 'INSERT INTO applications (username, domain, application, password) VALUES (%l, %d, %a, SHA2(%p,"512"))';
 
 // SQL query for deleting an application-specific password
-$config['application_passwords_delete_query'] = 'DELETE FROM vmail.applications WHERE username=%l AND domain=%d AND application=%a';
+$config['application_passwords_delete_query'] = 'DELETE FROM applications WHERE username=%l AND domain=%d AND application=%a';
 
 // By default the crypt() function which is used to create the '%c' 
 // parameter uses the md5 algorithm. To use different algorithms 
