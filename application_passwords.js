@@ -1,6 +1,6 @@
 if (window.rcmail) {
   rcmail.addEventListener('init', function(evt) {
-    var tab = $('<span>').attr('id', 'settingstabpluginapplication_passwords').addClass('tablink filter');
+    var tab = $('<li>').attr('id', 'settingstabpluginapplication_passwords').addClass('listitem');
     var button = $('<a>').attr('href', rcmail.env.comm_path+'&_action=plugin.application_passwords').html(rcmail.gettext('application_passwords', 'application_passwords')).appendTo(tab);
     rcmail.add_element(tab, 'tabs');
     rcmail.register_command('plugin.application_passwords-save', function() {

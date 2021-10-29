@@ -1,7 +1,7 @@
 <?php
 
 $labels = array();
-$labels['application_passwords'] = 'Application-specific passwords';
+$labels['application_passwords'] = 'Application Specific Passwords';
 
 // Used in step 1 when creating new password
 $labels['new_application_step1_legend'] = 'Step 1 of 2: Generate new application-specific password';
